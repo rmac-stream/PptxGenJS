@@ -1,4 +1,4 @@
-/* PptxGenJS 4.0.1 @ 2025-06-25T23:35:35.098Z */
+/* PptxGenJS 4.0.1 @ 2026-06-23T08:58:32.488Z */
 import JSZip from 'jszip';
 
 /******************************************************************************
@@ -6214,13 +6214,35 @@ function genXmlTextBody(slideObj) {
     });
     // STEP 6: Loop over each line and create paragraph props, text run, etc.
     arrLines.forEach(line => {
-        var _a;
         let reqsClosingFontSize = false;
-        // A: Start paragraph, add paraProps
+        // A: Start paragraph
         strSlideXml += '<a:p>';
-        // NOTE: `rtlMode` is like other opts, its propagated up to each text:options, so just check the 1st one
-        let paragraphPropXml = `<a:pPr ${((_a = line[0].options) === null || _a === void 0 ? void 0 : _a.rtlMode) ? ' rtl="1" ' : ''}`;
-        // B: Start paragraph, loop over lines and add text runs
+        /* A.1: Generate paragraph properties ONCE per paragraph.
+         * OOXML allows only a single `<a:pPr>` (the first child of `<a:p>`). Emitting one per
+         * run produced multiple `<a:pPr>` and caused PowerPoint to ignore line spacing / flag repair.
+         * Collect paragraph-level options across the paragraph's runs (first run that defines each
+         * option wins), then fall back to the parent shape's `opts`.
+         * NOTE: `bullet` is taken solely from `line[0]` (carried by the spread) - STEP 5 guarantees
+         * bullet only appears on the first run of a paragraph, so it must not be merged from later runs.
+         */
+        const paraOpts = Object.assign({}, (line[0].options || {}));
+        line.forEach(textObj => {
+            paraOpts.align = paraOpts.align || textObj.options.align;
+            paraOpts.lineSpacing = paraOpts.lineSpacing || textObj.options.lineSpacing;
+            paraOpts.lineSpacingMultiple = paraOpts.lineSpacingMultiple || textObj.options.lineSpacingMultiple;
+            paraOpts.indentLevel = paraOpts.indentLevel || textObj.options.indentLevel;
+            paraOpts.paraSpaceBefore = paraOpts.paraSpaceBefore || textObj.options.paraSpaceBefore;
+            paraOpts.paraSpaceAfter = paraOpts.paraSpaceAfter || textObj.options.paraSpaceAfter;
+            paraOpts.tabStops = paraOpts.tabStops || textObj.options.tabStops;
+        });
+        paraOpts.align = paraOpts.align || opts.align;
+        paraOpts.lineSpacing = paraOpts.lineSpacing || opts.lineSpacing;
+        paraOpts.lineSpacingMultiple = paraOpts.lineSpacingMultiple || opts.lineSpacingMultiple;
+        paraOpts.indentLevel = paraOpts.indentLevel || opts.indentLevel;
+        paraOpts.paraSpaceBefore = paraOpts.paraSpaceBefore || opts.paraSpaceBefore;
+        paraOpts.paraSpaceAfter = paraOpts.paraSpaceAfter || opts.paraSpaceAfter;
+        strSlideXml += genXmlParagraphProperties({ options: paraOpts }, false).replace('<a:pPr></a:pPr>', ''); // IMPORTANT: Empty "pPr" blocks will generate needs-repair/corrupt msg
+        // B: Loop over runs and add text runs (run-level properties only)
         line.forEach((textObj, idx) => {
             // A: Set line index
             textObj.options._lineIdx = idx;
@@ -6228,15 +6250,6 @@ function genXmlTextBody(slideObj) {
             if (idx > 0 && textObj.options.softBreakBefore) {
                 strSlideXml += '<a:br/>';
             }
-            // B: Inherit pPr-type options from parent shape's `options`
-            textObj.options.align = textObj.options.align || opts.align;
-            textObj.options.lineSpacing = textObj.options.lineSpacing || opts.lineSpacing;
-            textObj.options.lineSpacingMultiple = textObj.options.lineSpacingMultiple || opts.lineSpacingMultiple;
-            textObj.options.indentLevel = textObj.options.indentLevel || opts.indentLevel;
-            textObj.options.paraSpaceBefore = textObj.options.paraSpaceBefore || opts.paraSpaceBefore;
-            textObj.options.paraSpaceAfter = textObj.options.paraSpaceAfter || opts.paraSpaceAfter;
-            paragraphPropXml = genXmlParagraphProperties(textObj, false);
-            strSlideXml += paragraphPropXml.replace('<a:pPr></a:pPr>', ''); // IMPORTANT: Empty "pPr" blocks will generate needs-repair/corrupt msg
             // C: Inherit any main options (color, fontSize, etc.)
             // NOTE: We only pass the text.options to genXmlTextRun (not the Slide.options),
             // so the run building function cant just fallback to Slide.color, therefore, we need to do that here before passing options below.
