@@ -243,4 +243,19 @@ export default class Slide {
 		genObj.addTextDefinition(this, textParam, options, false)
 		return this
 	}
+
+	/**
+	 * Add WordArt to Slide
+	 * - WordArt is text with a warp/transform (`presetShape`) and/or a `gradient` fill
+	 * - applies WordArt-ish defaults (centered, plain `textNoShape` transform) that options can override
+	 * @param {string|TextProps[]} text - text string or complex object
+	 * @param {TextPropsOptions} options - text/WordArt options (`presetShape`, `gradient`, etc.)
+	 * @return {Slide} this Slide
+	 */
+	addWordArt(text: string | TextProps[], options?: TextPropsOptions): Slide {
+		const opts: TextPropsOptions = { align: 'center', presetShape: 'textNoShape', ...options }
+		const textParam = typeof text === 'string' || typeof text === 'number' ? [{ text, options: opts }] : text
+		genObj.addTextDefinition(this, textParam, opts, false)
+		return this
+	}
 }

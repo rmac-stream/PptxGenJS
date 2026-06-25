@@ -3,7 +3,7 @@
  */
 
 import { EMU, REGEX_HEX_COLOR, DEF_FONT_COLOR, ONEPT, SchemeColor, SCHEME_COLORS } from './core-enums'
-import { PresLayout, TextGlowProps, PresSlide, ShapeFillProps, Color, ShapeLineProps, Coord, ShadowProps } from './core-interfaces'
+import { PresLayout, TextGlowProps, PresSlide, ShapeFillProps, Color, ShapeLineProps, Coord, ShadowProps, GradientFillProps } from './core-interfaces'
 
 /**
  * Translates any type of `x`/`y`/`w`/`h` prop to EMU
@@ -211,6 +211,31 @@ export function genXmlColorSelection (props: Color | ShapeFillProps | ShapeLineP
 	}
 
 	return outText
+}
+
+/**
+ * Create a gradient fill (`<a:gradFill>`) - used by WordArt text fill
+ * @param {GradientFillProps} props - gradient props (2+ stops required)
+ * @returns {string} XML string
+ * @see http://officeopenxml.com/drwSp-GradFill.php
+ */
+export function genXmlGradientFill (props: GradientFillProps): string {
+	// OOXML requires >=2 gradient stops; fewer produces a corrupt file
+	if (!props || !props.stops || props.stops.length < 2) throw new Error('gradient `stops` requires at least 2 entries')
+
+	const stops = props.stops
+		.map(stop => {
+			const inner = stop.transparency ? `<a:alpha val="${Math.round((100 - stop.transparency) * 1000)}"/>` : ''
+			return `<a:gs pos="${Math.round((stop.position || 0) * 1000)}">${createColorElement(stop.color, inner)}</a:gs>`
+		})
+		.join('')
+
+	const geom =
+		props.type === 'radial'
+			? '<a:path path="circle"><a:fillToRect l="50000" t="50000" r="50000" b="50000"/></a:path>'
+			: `<a:lin ang="${Math.round(((props.angle || 0) % 360) * 60000)}" scaled="1"/>`
+
+	return `<a:gradFill rotWithShape="1"><a:gsLst>${stops}</a:gsLst>${geom}</a:gradFill>`
 }
 
 /**
