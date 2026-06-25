@@ -16,13 +16,14 @@ import { genSlides_Media } from "./demo_media.mjs";
 import { genSlides_Shape } from "./demo_shape.mjs";
 import { genSlides_Table } from "./demo_table.mjs";
 import { genSlides_Text } from "./demo_text.mjs";
+import { genSlides_WordArt } from "./demo_wordart.mjs";
 
 const DEPRECATED_TEST_MODE = false;
 
 // ==================================================================================================================
 
 export function runEveryTest(pptxgen) {
-	return execGenSlidesFuncs(["Master", "Chart", "Image", "Media", "Shape", "Text", "Table"], pptxgen);
+	return execGenSlidesFuncs(["Master", "Chart", "Image", "Media", "Shape", "Text", "Table", "WordArt"], pptxgen);
 
 	// NOTE: Html2Pptx needs table to be visible (otherwise col widths are even and look horrible)
 	// ....: Therefore, run it manually. // if ( typeof table2slides1 !== 'undefined' ) table2slides1();
@@ -60,6 +61,7 @@ export function execGenSlidesFuncs(type, pptxgen) {
 		else if (type === "Shape") genSlides_Shape(pptx);
 		else if (type === "Table") genSlides_Table(pptx);
 		else if (type === "Text") genSlides_Text(pptx);
+		else if (type === "WordArt") genSlides_WordArt(pptx);
 		//if (console.timeEnd) console.timeEnd(type);
 	});
 

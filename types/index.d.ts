@@ -1027,6 +1027,44 @@ declare namespace PptxGenJS {
 		 */
 		alpha?: number
 	}
+	/**
+	 * WordArt text warp preset (OOXML `ST_TextShapeType` / `<a:prstTxWarp>`)
+	 * - matches the "Transform" gallery in PowerPoint > Text Effects
+	 */
+	export type TextShapeType =
+		| 'textNoShape' | 'textPlain' | 'textStop' | 'textTriangle' | 'textTriangleInverted'
+		| 'textChevron' | 'textChevronInverted' | 'textRingInside' | 'textRingOutside'
+		| 'textArchUp' | 'textArchDown' | 'textCircle' | 'textButton'
+		| 'textArchUpPour' | 'textArchDownPour' | 'textCirclePour' | 'textButtonPour'
+		| 'textCurveUp' | 'textCurveDown' | 'textCanUp' | 'textCanDown'
+		| 'textWave1' | 'textWave2' | 'textDoubleWave1' | 'textWave4'
+		| 'textInflate' | 'textDeflate' | 'textInflateBottom' | 'textDeflateBottom'
+		| 'textInflateTop' | 'textDeflateTop' | 'textDeflateInflate' | 'textDeflateInflateDeflate'
+		| 'textFadeRight' | 'textFadeLeft' | 'textFadeUp' | 'textFadeDown'
+		| 'textSlantUp' | 'textSlantDown' | 'textCascadeUp' | 'textCascadeDown'
+	/**
+	 * A single color stop in a gradient fill
+	 */
+	export interface GradientStop {
+		/** Stop color - `HexColor` or `ThemeColor` */
+		color: Color
+		/** Position along the gradient (percent, 0-100) */
+		position: number
+		/** Transparency (percent, 0-100) */
+		transparency?: number
+	}
+	/**
+	 * Gradient fill (used by WordArt text fill via `addWordArt`)
+	 * @example { angle: 45, stops: [{ color:'FF0000', position:0 }, { color:'0000FF', position:100 }] }
+	 */
+	export interface GradientFillProps {
+		/** Gradient type @default 'linear' */
+		type?: 'linear' | 'radial'
+		/** Linear gradient angle (degrees, 0-359). Ignored for `radial`. @default 0 */
+		angle?: number
+		/** Color stops (2 or more required) */
+		stops: GradientStop[]
+	}
 	export interface ShapeLineProps extends ShapeFillProps {
 		/**
 		 * Line width (pt)
@@ -1832,6 +1870,16 @@ declare namespace PptxGenJS {
 		 */
 		flipV?: boolean
 		glow?: TextGlowProps
+		/**
+		 * Gradient text fill (WordArt). When set, overrides solid `color`.
+		 * @example { angle: 45, stops: [{ color:'FF0000', position:0 }, { color:'0000FF', position:100 }] }
+		 */
+		gradient?: GradientFillProps
+		/**
+		 * WordArt text warp/transform preset (`<a:prstTxWarp>`)
+		 * @example 'textArchUp'
+		 */
+		presetShape?: TextShapeType
 		hyperlink?: HyperlinkProps
 		indentLevel?: number
 		isTextBox?: boolean
@@ -2670,6 +2718,15 @@ declare namespace PptxGenJS {
 		 * @return {Slide} this Slide
 		 */
 		addText(text: string | TextProps[], options?: TextPropsOptions): Slide
+		/**
+		 * Add WordArt to Slide
+		 * - WordArt is text with a warp/transform (`presetShape`) and/or a `gradient` fill
+		 * - applies WordArt-ish defaults (centered, plain `textNoShape` transform) that options can override
+		 * @param {string|TextProps[]} text - text string or complex object
+		 * @param {TextPropsOptions} options - text/WordArt options (`presetShape`, `gradient`, etc.)
+		 * @return {Slide} this Slide
+		 */
+		addWordArt(text: string | TextProps[], options?: TextPropsOptions): Slide
 
 		/**
 		 * Background color
