@@ -1,4 +1,4 @@
-/* PptxGenJS 4.0.1 @ 2026-06-23T09:46:41.547Z */
+/* PptxGenJS 4.0.1 @ 2026-06-25T13:04:15.463Z */
 import JSZip from 'jszip';
 
 /******************************************************************************
@@ -812,6 +812,27 @@ function genXmlColorSelection(props) {
         }
     }
     return outText;
+}
+/**
+ * Create a gradient fill (`<a:gradFill>`) - used by WordArt text fill
+ * @param {GradientFillProps} props - gradient props (2+ stops required)
+ * @returns {string} XML string
+ * @see http://officeopenxml.com/drwSp-GradFill.php
+ */
+function genXmlGradientFill(props) {
+    // OOXML requires >=2 gradient stops; fewer produces a corrupt file
+    if (!props || !props.stops || props.stops.length < 2)
+        throw new Error('gradient `stops` requires at least 2 entries');
+    const stops = props.stops
+        .map(stop => {
+        const inner = stop.transparency ? `<a:alpha val="${Math.round((100 - stop.transparency) * 1000)}"/>` : '';
+        return `<a:gs pos="${Math.round((stop.position || 0) * 1000)}">${createColorElement(stop.color, inner)}</a:gs>`;
+    })
+        .join('');
+    const geom = props.type === 'radial'
+        ? '<a:path path="circle"><a:fillToRect l="50000" t="50000" r="50000" b="50000"/></a:path>'
+        : `<a:lin ang="${Math.round(((props.angle || 0) % 360) * 60000)}" scaled="1"/>`;
+    return `<a:gradFill rotWithShape="1"><a:gsLst>${stops}</a:gsLst>${geom}</a:gradFill>`;
 }
 /**
  * Get a new rel ID (rId) for charts, media, etc.
@@ -2901,6 +2922,20 @@ class Slide {
     addText(text, options) {
         const textParam = typeof text === 'string' || typeof text === 'number' ? [{ text, options }] : text;
         addTextDefinition(this, textParam, options, false);
+        return this;
+    }
+    /**
+     * Add WordArt to Slide
+     * - WordArt is text with a warp/transform (`presetShape`) and/or a `gradient` fill
+     * - applies WordArt-ish defaults (centered, plain `textNoShape` transform) that options can override
+     * @param {string|TextProps[]} text - text string or complex object
+     * @param {TextPropsOptions} options - text/WordArt options (`presetShape`, `gradient`, etc.)
+     * @return {Slide} this Slide
+     */
+    addWordArt(text, options) {
+        const opts = Object.assign({ align: 'center', presetShape: 'textNoShape' }, options);
+        const textParam = typeof text === 'string' || typeof text === 'number' ? [{ text, options: opts }] : text;
+        addTextDefinition(this, textParam, opts, false);
         return this;
     }
 }
@@ -5947,11 +5982,14 @@ function genXmlTextRunProperties(opts, isDefault) {
     runProps += opts.charSpacing ? ` spc="${Math.round(opts.charSpacing * 100)}" kern="0"` : ''; // IMPORTANT: Also disable kerning; otherwise text won't actually expand
     runProps += ' dirty="0">';
     // Color / Font / Highlight / Outline are children of <a:rPr>, so add them now before closing the runProperties tag
-    if (opts.color || opts.fontFace || opts.outline || (typeof opts.underline === 'object' && opts.underline.color)) {
+    if (opts.color || opts.gradient || opts.fontFace || opts.outline || (typeof opts.underline === 'object' && opts.underline.color)) {
         if (opts.outline && typeof opts.outline === 'object') {
             runProps += `<a:ln w="${valToPts(opts.outline.size || 0.75)}">${genXmlColorSelection(opts.outline.color || 'FFFFFF')}</a:ln>`;
         }
-        if (opts.color)
+        // WordArt gradient text fill takes precedence over solid color
+        if (opts.gradient)
+            runProps += genXmlGradientFill(opts.gradient);
+        else if (opts.color)
             runProps += genXmlColorSelection({ color: opts.color, transparency: opts.transparency });
         if (opts.highlight)
             runProps += `<a:highlight>${createColorElement(opts.highlight)}</a:highlight>`;
@@ -6055,6 +6093,9 @@ function genXmlBodyProperties(slideObject) {
             bodyProperties += ' vert="' + slideObject.options._bodyProp.vert + '"'; // VALS: [eaVert,horz,mongolianVert,vert,vert270,wordArtVert,wordArtVertRtl]
         // E: Close <a:bodyPr element
         bodyProperties += '>';
+        // E.1: WordArt text warp/transform (`<a:prstTxWarp>`) - must precede the autofit element per schema
+        if (slideObject.options.presetShape)
+            bodyProperties += `<a:prstTxWarp prst="${slideObject.options.presetShape}"><a:avLst/></a:prstTxWarp>`;
         /**
          * F: Text Fit/AutoFit/Shrink option
          * @see: http://officeopenxml.com/drwSp-text-bodyPr-fit.php
